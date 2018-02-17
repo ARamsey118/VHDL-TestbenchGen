@@ -93,6 +93,7 @@ class Entity(object):
 	def __init__(self, name):
 		self._name = name
 		self._port = {}
+		self._generic = {}
 
 	def getName(self):
 		return self._name
@@ -105,6 +106,15 @@ class Entity(object):
 
 	def getPorts(self):
 		return self._port
+
+	def setGenericList(self, p):
+		if isinstance(p, GenericList):
+			self._generic = p.getGenerics()
+			return True
+		return False
+
+	def getGenerics(self):
+		return self._generic
 
 	def __str__(self):
 		return "<Entity %s>" % self._name
@@ -119,9 +129,10 @@ class Signal(object):
 	_type = ""
 	_value = ""
 
-	def __init__(self, name, type):
+	def __init__(self, name, t, value=""):
 		self.setName(name)
-		self.setType(type)
+		self.setType(t)
+		self.setValue(value)
 
 	def getName(self):
 		return self._name
@@ -210,6 +221,19 @@ class SignalList(object):
 			print "error: no es pot llegir el 'signal': %s" % e
 		return signals
 
+class Generic(Signal):
+
+	_obj_name = "generic"
+# TODO Fix value parsing with extra space
+
+	def __init__(self, name, t, value):
+		Signal.__init__(self, name, t, value)
+
+	def __eq__(self, other):
+		if isinstance(other, Generic):
+			return self._name == other.getName() and self._type == other.getType()
+		return False
+
 class Port(Signal):
 
 	_obj_name = "port"
@@ -267,26 +291,75 @@ class PortList(object):
 					break
 			if counting:
 				between_port += s[i]
-		try:
-			port = between_port.strip()[1:].replace("\n", "")
-			for p in port.split(";"):
-				port_name, t = p.split(":")
-				port_name = port_name.strip()
-				t = t.strip()
-				for i in range(len(t)):
-					if t[i] == " ":
-						port_type = t[:i].strip()
-						variable_type = t[i+1:].strip()
-						break
-				if "," in port_name:
-					for n in port_name.split(","):
-						n = n.strip()
-						ports[n] = Port(n, port_type, variable_type)
-				else:		
-					ports[port_name] = Port(port_name, port_type, variable_type)
-		except Exception as e:
-			print "error: sembla que el port està malformat"
+                port = between_port.strip()[1:].replace("\n", "")
+                for p in port.split(";"):
+                        port_name, t = p.split(":")
+                        port_name = port_name.strip()
+                        t = t.strip()
+                        for i in range(len(t)):
+                                if t[i] == " ":
+                                        port_type = t[:i].strip()
+                                        variable_type = t[i+1:].strip()
+                                        break
+                        if "," in port_name:
+                                for n in port_name.split(","):
+                                        n = n.strip()
+                                        ports[n] = Port(n, port_type, variable_type)
+                        else:		
+                                ports[port_name] = Port(port_name, port_type, variable_type)
 		return ports
+
+class GenericList(object):
+
+	def __init__(self, generic_str):
+		self._generics = self._getGenericFromString(generic_str.strip())
+		if self._generics == None:
+			self._generics = {}
+
+	def getGenerics(self):
+		return self._generics
+
+	def _getGenericFromString(self, s):
+		generics = {}
+		counting = False
+		skip_times, bracket_count = 0, 0
+		between_generic = ""
+		for i in range(len(s)):
+			if skip_times > 0:
+				skip_times -= 1
+				continue
+			elif s[i:i+7] == "generic":
+				counting = True
+				skip_times = 6
+				continue
+			elif s[i] == "(":
+				bracket_count += 1
+			elif s[i] == ")":
+				bracket_count -= 1
+				if bracket_count == 0:
+					break
+			if counting:
+				between_generic += s[i]
+		try:
+			generic = between_generic.strip()[1:].replace("\n", "")
+			for p in generic.split(";"):
+                                isGenericWithAssignment = ":=" in p
+                                if isGenericWithAssignment:
+                                        left, assignment = p.split(":=")
+                                else:
+                                        left = generic
+				generic_name, t = left.split(":")
+				generic_name = generic_name.strip()
+				t = t.strip()
+				if "," in generic_name:
+					for n in generic_name.split(","):
+						n = n.strip()
+						generics[n] = Generic(n, t, assignment)
+				else:
+					generics[generic_name] = Generic(generic_name, t, assignment)
+		except Exception as e:
+			print "error: the generic is malformed"
+		return generics
 
 class Architecture(object):
 

@@ -13,7 +13,7 @@ vParser
 
 def read_file(filename):
 	if not os.path.isfile(filename):
-		print "error: l'arxiu '%s' no existeix" % filename
+		print "error: file '%s' does not exist" % filename
 		sys.exit(1)
 
 	try:
@@ -22,7 +22,7 @@ def read_file(filename):
 		return content
 	
 	except Exception as e:
-		print "error: no hem pogut llegir l'arxiu '%s'" % filename
+		print "error: failed to open file '%s'" % filename
 		sys.exit(1)
 
 def write_file(filename, content):
@@ -37,7 +37,7 @@ def getBetween(s, pref, suf):
 	except Exception:
 		return ("", -1)
 
-def getLibs(vhdl_file):
+def parseLibs(vhdl_file):
 	libs = {}
 	if "library" not in vhdl_file:
 		return []
@@ -96,12 +96,48 @@ def getLibs(vhdl_file):
 			if not ignore_line:
 				libs[lib].addPackage(package)
 		else:
-			print "error: s'està utilitzant la llibreria '%s' al paquet '%s.%s' sense haver-la afegit" % (lib, lib, package)
+			print "error: library '%s' is being used by the package '%s.%s' but has not been added" % (lib, lib, package)
 			break
 	
 	return libs.values()
 
-def getEntities(vhdl_file):
+def parsePortsGenerics(vhdl_file, entity, isPort):
+        port = ""
+        search_string = ""
+        if isPort:
+            search_string = "port"
+        else:
+            search_string = "generic"
+        bracket_counter = 0
+        isCounting, isPortFound, isValidPort = False, False, False
+        between_entity = getBetween(vhdl_file, entity.getName() + " is", "end")[0].strip()
+
+        for i in range(len(between_entity)):
+                if between_entity[i:i+len(search_string)] == search_string:
+                        isCounting = True
+                        isPortFound = True
+                if isCounting:
+                        port += between_entity[i]
+                        if between_entity[i] == "(":
+                                bracket_counter += 1
+                        elif between_entity[i] == ")":
+                                bracket_counter -= 1
+                        elif between_entity[i] == ";" and bracket_counter == 0:
+                                isPortFound = True
+                                isValidPort = True
+                                break
+        else:
+                isValidPort = False
+
+        if isValidPort:
+            if isPort:
+                entity.setPortList(PortList(port))
+            else:
+                entity.setGenericList(GenericList(port))
+        elif isPortFound:
+                print "error: illegal or missing port/generic definition"
+
+def parseEntities(vhdl_file):
 	entities = []
 	last_pos = 0
 	
@@ -113,38 +149,16 @@ def getEntities(vhdl_file):
 			break
 		
 		last_pos += value[1]
-		between_entity = getBetween(vhdl_file, entity.getName() + " is", "end")[0].strip()
-		port = ""
-		bracket_counter = 0
-		isCounting, isPortFound, isValidPort = False, False, False
-		
-		for i in range(len(between_entity)):
-			if between_entity[i:i+4] == "port":
-				isCounting = True
-				isPortFound = True
-			if isCounting:
-				port += between_entity[i]
-				if between_entity[i] == "(":
-					bracket_counter += 1
-				elif between_entity[i] == ")":
-					bracket_counter -= 1
-				elif between_entity[i] == ";" and bracket_counter == 0:
-					isPortFound = True
-					isValidPort = True
-					break
-		else:
-			isValidPort = False
-
-		if isValidPort:
-			entity.setPortList(PortList(port))
-		elif isPortFound:
-			print "error: no es pot llegir el port definit a l'entitat '%s'" % entity.getName()
+                parsePortsGenerics(vhdl_file, entity, False) # get generics
+                print entity.getGenerics()
+                parsePortsGenerics(vhdl_file, entity, True) # get ports
+                print entity.getPorts()
 	
 		entities += [entity]
 	
 	return entities
 
-def getArchitectureOfEntity(vhdl_file, entity):
+def parseArchitectureOfEntity(vhdl_file, entity):
 	last_pos = 0
 	
 	while True:
@@ -166,5 +180,5 @@ def getArchitectureOfEntity(vhdl_file, entity):
 		
 		return arch
 	
-	print "error: no s'ha trobat cap arquitectura de l'entitat '%s'" % entity.getName()
+	print "error: no architectures found for '%s'" % entity.getName()
 	sys.exit(1)
