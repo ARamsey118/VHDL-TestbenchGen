@@ -13,7 +13,7 @@ def libraryTb():
     return "%s%s\n\n" % ("\n".join(libs), "\n".join(uses))
 
 def entityTb():
-    entities = ['entity %s_tb is\nend %s_tb;' % (a.getEntity().getName(), a.getEntity().getName()) for a in vhdl.getArchitectures()]
+    entities = ['entity tb_%s is\nend tb_%s;' % (a.getEntity().getName(), a.getEntity().getName()) for a in vhdl.getArchitectures()]
     return "\n".join(entities) + "\n\n"
 
 def architectureTb():
@@ -68,7 +68,7 @@ def dutTb():
 def resetTb():
     rst = False
     activeHigh = True
-    for x in vhdl.getEntities()[0].getPorts():
+    for x in list(vhdl.getEntities())[0].getPorts():
         if x.find("rst") >= 0 or x.find("reset") >= 0:
             rst = True
             if x.find("n") >= 0:
@@ -76,15 +76,15 @@ def resetTb():
     if rst:
         while True:
             try:
-                rst_len = raw_input("Number of periods to hold rst (default 5): ") # TODO: make sure reset is deasserted on the falling edge
+                rst_len = input("Number of periods to hold rst (default 5): ") # TODO: make sure reset is deasserted on the falling edge
                 if rst_len == "":
                     rst_len = "5"
                 rst_len = float(rst_len)
                 if rst_len > 0:
                     break
             except Exception as e:
-                print e
-                print "error: Invalid reset length"
+                print(e)
+                print("error: Invalid reset length")
 
         return "\n\n\trst_process: process\n\tbegin\n\t\trst <= '%d';\n\t\twait for %d*clk_period;\n\t\trst <= '%d';\n\t\twait;\n\tend process rst_process;" % (activeHigh, rst_len, not activeHigh)
     else:
@@ -92,21 +92,21 @@ def resetTb():
 
 def clockTb():
     clk = False
-    for x in vhdl.getEntities()[0].getPorts():
+    for x in list(vhdl.getEntities())[0].getPorts():
         if x == 'clk' or x == 'clock' or x == 'i_clk' or x == 'i_clock':
             clk = True
     if clk:
         while True:
             try:
-                clk_freq = raw_input("Enter clock period (ns) (default 10): ")
+                clk_freq = input("Enter clock period (ns) (default 10): ")
                 if clk_freq == "":
                     clk_freq = "10"
                 clk_freq = int(clk_freq)
                 if clk_freq > 0:
                     break
             except Exception as e:
-                print e
-                print "error: Invalid frequency"
+                print(e)
+                print("error: Invalid frequency")
 
         return ("\tconstant clk_period : time := {0} ns;\n".format(clk_freq), "\n\n\tclk_process: process\n\tbegin\n\t\tclk <= '0';\n\t\twait for clk_period/2;\n\t\tclk <= '1';\n\t\twait for clk_period/2;\n\tend process clk_process;")
     else:
@@ -115,13 +115,13 @@ def clockTb():
 if __name__ == "__main__":
 
     if len(sys.argv) != 2:
-        print "usage: {} <VHDL file>.vhd".format(sys.argv[0])
+        print("usage: {} <VHDL file>.vhd".format(sys.argv[0]))
         sys.exit(1)
 
     vhdl_filename = sys.argv[1].split('.')
 
     if vhdl_filename[-1] != 'vhd':
-        print 'error: file must have a vhd extenstion'
+        print('error: file must have a vhd extenstion')
         sys.exit(1)
 
     vhdl_filename = vhdl_filename[0].split('/')
@@ -135,7 +135,6 @@ if __name__ == "__main__":
     # Creating VHDL obj
     vhdl = VHDL()
     [vhdl.addLibrary(l) for l in parseLibs(vhd_file)] # TODO add numeric_std if not present
-    print vhdl.getLibs()
     [vhdl.setEntity(e) for e in parseEntities(vhd_file)]
 
     # Get each entity in 'vhdl' and adds each architecture in 'vhdl'
@@ -146,4 +145,4 @@ if __name__ == "__main__":
 
     # Write to file
     write_file(vhdl_filename, libraryTb() + entityTb() + architectureTb())
-    print "\nThe file '%s' was created successfully." % vhdl_filename
+    print("\nThe file '%s' was created successfully." % vhdl_filename)
