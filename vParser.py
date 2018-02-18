@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 from vhdl import *
@@ -33,7 +33,7 @@ def getBetween(s, pref, suf):
     try:
         start = 0 if pref == "" else s.index(pref)
         end = len(s) if suf == "" else s[start:].index(suf)
-        return (s[start + len(pref):start+end], end)
+        return (s[start + len(pref):start+end], start+end)
     except Exception:
         return ("", -1)
 
@@ -49,7 +49,7 @@ def parseLibs(vhdl_file):
 
         ignore_line = False
 
-        for i in range(last_pos, value[1] + len(value[0]))[::-1]:
+        for i in range(last_pos, last_pos + len(value[0]))[::-1]:
             if vhdl_file[i] == '\n':
                 break
 
@@ -71,12 +71,14 @@ def parseLibs(vhdl_file):
             libs[lib_name] = Library(lib_name)
     last_pos = 0
 
+    libs["work"] = Library("work") # Present by default
+
     while True:
         value = getBetween(vhdl_file[last_pos:], "use", ";")
 
         ignore_line = False
 
-        for i in range(last_pos, value[1] + len(value[0]))[::-1]:
+        for i in range(last_pos, last_pos + len(value[0]))[::-1]:
             if vhdl_file[i] == '\n':
                 break
 
@@ -92,7 +94,7 @@ def parseLibs(vhdl_file):
         use_statment = value[0].strip().lower().split(".")
         lib, package = use_statment[0], ".".join(use_statment[1:])
 
-        if lib in libs.keys():
+        if lib in libs.keys() or lib == "work":
             if not ignore_line:
                 libs[lib].addPackage(package)
         else:
@@ -132,6 +134,19 @@ def parsePortsGenerics(vhdl_file, entity, isPort):
     if isValidPort:
         if isPort:
             entity.setPortList(PortList(port))
+            ports = set(entity.getPorts().keys())
+            clks = ['clk', 'clock']
+            rsts = ['rst', 'reset']
+            clk_search = True
+            for search_port in [clks, rsts]:
+                port = [port for port in ports if any(x in port for x in search_port)]
+                if port:
+                    port = port[0] # TODO Deal with multiple clocks/resets
+                if clk_search:
+                    entity.clk = port
+                    clk_search = False # TODO This is probably not the best way
+                else:
+                    entity.rst = port
         else:
             entity.setGenericList(GenericList(port))
     elif isPortFound:

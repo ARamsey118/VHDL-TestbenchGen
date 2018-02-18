@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 import sys
@@ -8,8 +8,10 @@ from vParser import *
 def libraryTb():
     libs, uses = [], []
     for l in vhdl.getLibs():
-        libs += ['library %s;' % l.getName()]
         uses += ['use %s;' % p for p in l.getPackages()]
+        if l.getName() == "work":
+            continue # skip work library, but not work packages
+        libs += ['library %s;\n' % l.getName()]
     return "%s%s\n\n" % ("\n".join(libs), "\n".join(uses))
 
 def entityTb():
@@ -22,28 +24,33 @@ def architectureTb():
         entity = architecture.getEntity()
         clk = clockTb()
         generics = genericsTb()
-        result += 'architecture behav of %s_tb is\n\tcomponent %s\n' % (entity.getName(), entity.getName())
+        result += 'architecture behav of tb_%s is\n\tcomponent %s\n' % (entity.getName(), entity.getName())
         result += generics[1] + portsTb() + generics[0] + clk[0] + dutSignalsTb() + dutTb() + clk[1] + resetTb()
-        result += '\n\t-- Add stimulus process here:\nend behav;' # TODO Add assert false at end
+        result += "\n\n\tstim_process: process\nbegin\n\t\t"
+        if entity.rst:
+            result += "wait on {0};\n\t\t".format(entity.rst) # TODO Doesn't actually work...
+        result += "--insert stimulus here\n\n\t\tassert false\n\t\t\treport \"Simulation finished\"\n\t\t\tseverity failure;\n\tend process stim_process;\n\nend behav;"
     return result
 
 def genericsTb():
-    result = '\tgeneric ('
+    result = '\tgeneric (\n\t\t'
     constants = ""
     for arch in vhdl.getArchitectures():
         ent = arch.getEntity()
         generics = ['\t{0} : {1};\n'.format(g.getName(), g.getType()) for g in ent.getGenerics().values()]
-        result += "\t\t".join(generics)[:-2] + ');\n'
+        result += "\t\t".join(generics)[:-2] + '\n\t);\n'
+        if generics == []:
+            result = ""
         for g in ent.getGenerics().values():
             constants += '\tconstant {0} : {1} := {2};\n'.format(g.getName(), g.getType(), g.getValue())
     return (constants, result)
 
 def portsTb():
-    result = '\tport ('
+    result = '\tport (\n\t\t'
     for arch in vhdl.getArchitectures():
         ent = arch.getEntity()
         ports = ['\t{0} : {1} {2};\n'.format(p.getName(), p.getPortType(), p.getType()) for p in ent.getPorts().values()]
-        result += "\t\t".join(ports)[:-2] + ');\n\tend component;\n\n'
+        result += "\t\t".join(ports)[:-2] + '\n\t);\n\tend component;\n\n'
     return result
 
 def dutSignalsTb():
@@ -59,21 +66,24 @@ def dutTb():
     for architecture in vhdl.getArchitectures():
         entity = architecture.getEntity()
         result += '\tUUT: %s ' % entity.getName()
-        result += "port map (\n"
+        g = entity.getGenerics().values()
+        if g:
+            result += "generic map (\n"
+            for generic in g:
+                result += '\t\t%s => %s,\n' % (generic.getName(), generic.getName())
+            result = result[:-2] + "\n\t)\n"
+        result += "\tport map (\n"
         for p in entity.getPorts().values():
             result += '\t\t%s => %s,\n' % (p.getName(), p.getName())
-        result = result[:-2] + ");\n"
+        result = result[:-2] + "\n\t);\n"
     return result
 
-def resetTb():
-    rst = False
+def resetTb(): # TODO Very confused without a clock
     activeHigh = True
-    for x in list(vhdl.getEntities())[0].getPorts():
-        if x.find("rst") >= 0 or x.find("reset") >= 0:
-            rst = True
-            if x.find("n") >= 0:
-                activeHigh = False
+    rst = list(vhdl.getEntities())[0].rst
     if rst:
+        if rst.find("n") >= 0:
+            activeHigh = False
         while True:
             try:
                 rst_len = input("Number of periods to hold rst (default 5): ") # TODO: make sure reset is deasserted on the falling edge
@@ -86,16 +96,13 @@ def resetTb():
                 print(e)
                 print("error: Invalid reset length")
 
-        return "\n\n\trst_process: process\n\tbegin\n\t\trst <= '%d';\n\t\twait for %d*clk_period;\n\t\trst <= '%d';\n\t\twait;\n\tend process rst_process;" % (activeHigh, rst_len, not activeHigh)
+        return "\n\n\trst_process: process\n\tbegin\n\t\t%s <= '%d';\n\t\twait for %d*clk_period;\n\t\t%s <= '%d';\n\t\twait;\n\tend process rst_process;" % (rst, activeHigh, rst_len, rst, not activeHigh)
     else:
         return ""
 
 def clockTb():
     clk = False
-    for x in list(vhdl.getEntities())[0].getPorts():
-        if x == 'clk' or x == 'clock' or x == 'i_clk' or x == 'i_clock':
-            clk = True
-    if clk:
+    if list(vhdl.getEntities())[0].clk:
         while True:
             try:
                 clk_freq = input("Enter clock period (ns) (default 10): ")
@@ -108,7 +115,7 @@ def clockTb():
                 print(e)
                 print("error: Invalid frequency")
 
-        return ("\tconstant clk_period : time := {0} ns;\n".format(clk_freq), "\n\n\tclk_process: process\n\tbegin\n\t\tclk <= '0';\n\t\twait for clk_period/2;\n\t\tclk <= '1';\n\t\twait for clk_period/2;\n\tend process clk_process;")
+        return ("\tconstant clk_period : time := {0} ns;\n".format(clk_freq), "\n\n\tclk_process: process\n\tbegin\n\t\t{0} <= '0';\n\t\twait for clk_period/2;\n\t\t{0} <= '1';\n\t\twait for clk_period/2;\n\tend process clk_process;".format(list(vhdl.getEntities())[0].clk)) 
     else:
         return ("", "")
 
@@ -134,7 +141,8 @@ if __name__ == "__main__":
 
     # Creating VHDL obj
     vhdl = VHDL()
-    [vhdl.addLibrary(l) for l in parseLibs(vhd_file)] # TODO add numeric_std if not present
+    libs = parseLibs(vhd_file)
+    [vhdl.addLibrary(l) for l in libs] # TODO add numeric_std if not present
     [vhdl.setEntity(e) for e in parseEntities(vhd_file)]
 
     # Get each entity in 'vhdl' and adds each architecture in 'vhdl'

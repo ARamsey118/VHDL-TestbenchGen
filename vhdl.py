@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 """
@@ -72,7 +72,7 @@ class Library(object):
         if self._lib + "." + package_name not in self._packages:
             self._packages += [self._lib + "." + package_name]
         else:
-            print("error: el paquet '{0}' ja es troba a la library".format(package_name))
+            print("error: the package '{0}' is already in the library".format(package_name))
 
     def getPackages(self):
         return self._packages
@@ -94,6 +94,8 @@ class Entity(object):
         self._name = name
         self._port = {}
         self._generic = {}
+        self.rst = ""
+        self.clk = ""
 
     def getName(self):
         return self._name
@@ -224,7 +226,6 @@ class SignalList(object):
 class Generic(Signal):
 
     _obj_name = "generic"
-# TODO Fix value parsing with extra space
 
     def __init__(self, name, t, value):
         Signal.__init__(self, name, t, value)
@@ -295,6 +296,8 @@ class PortList(object):
         for p in port.split(";"):
             port_name, t = p.split(":")
             port_name = port_name.strip()
+            if port_name[0:2] == "--":
+                continue
             t = t.strip()
             for i in range(len(t)):
                 if t[i] == " ":
@@ -350,7 +353,10 @@ class GenericList(object):
                     left = generic
                 generic_name, t = left.split(":")
                 generic_name = generic_name.strip()
+                if generic_name[0:2] == "--":
+                    continue
                 t = t.strip()
+                assignment = assignment.strip()
                 if "," in generic_name:
                     for n in generic_name.split(","):
                         n = n.strip()
