@@ -78,25 +78,35 @@ def dutTb():
         result = result[:-2] + "\n\t);\n"
     return result
 
-def resetTb(): # TODO Very confused without a clock
+def resetTb():
+    clk = True
+    clkStr = "*clk_period"
     activeHigh = True
+    rst_len = 0
     rst = list(vhdl.getEntities())[0].rst
+    if not list(vhdl.getEntities())[0].clk:
+        confirm = input("No clock is present, but reset is. Add reset anyway? [Y/n] ")
+        if "n" in confirm.lower():
+            rst = ""
+        else:
+            clkStr = "100 ns"
+            clk = False
     if rst:
         if rst.find("n") >= 0:
             activeHigh = False
-        while True:
+        while True and clk:
             try:
                 rst_len = input("Number of periods to hold rst (default 5): ") # TODO: make sure reset is deasserted on the falling edge
                 if rst_len == "":
                     rst_len = "5"
-                rst_len = float(rst_len)
+                rst_len = int(rst_len)
                 if rst_len > 0:
                     break
             except Exception as e:
                 print(e)
                 print("error: Invalid reset length")
 
-        return "\n\n\trst_process: process\n\tbegin\n\t\t%s <= '%d';\n\t\twait for %d*clk_period;\n\t\t%s <= '%d';\n\t\twait;\n\tend process rst_process;" % (rst, activeHigh, rst_len, rst, not activeHigh)
+        return "\n\n\trst_process: process\n\tbegin\n\t\t%s <= '%d';\n\t\twait for %s%s;\n\t\t%s <= '%d';\n\t\twait;\n\tend process rst_process;" % (rst, activeHigh, rst_len if clk else "", clkStr, rst, not activeHigh)
     else:
         return ""
 
