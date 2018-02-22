@@ -144,7 +144,7 @@ class Signal(object):
         if isinstance(n, str):
             self._name = n
         else:
-            print("error: el nom '%s' ha de ser una cadena" % self._obj_name)
+            print("error: the name '%s' must be a string" % self._obj_name)
 
     def setValue(self, val):
         self._value = val
@@ -159,7 +159,7 @@ class Signal(object):
         if isinstance(t, str):
             self._type = t
         else:
-            print("error: el tipus '%s' ha de ser una cadena" % self._obj_name)
+            print("error: the type '%s' must be a string" % self._obj_name)
 
     def __str__(self):
         if self._value == "":
@@ -193,7 +193,7 @@ class SignalList(object):
                 else:
                     left = signal
                 if ":" not in left:
-                    print("atenció: s'ha ignorat la línia '%s'" % left.strip())
+                    print("warning: line '%s' was ignored" % left.strip())
                     continue
                 port_prefix, t = left.strip().split(":")
                 port_prefix = port_prefix.strip()
@@ -203,7 +203,7 @@ class SignalList(object):
                         port_prefix = port_prefix[i+1:].strip()
                         break
                 else:
-                    print("error: el senyal '%s' és invàlid" % signal)
+                    print("error: the signal '%s' is invalid" % signal)
                     return signals
                 if variable_type == "type":
                     continue
@@ -221,7 +221,7 @@ class SignalList(object):
                         signal.setValue(assignation)
                     signals[port_prefix] = signal
         except Exception as e:
-            print("error: no es pot llegir el 'signal': %s" % e)
+            print("error: cannot read 'signal': %s" % e)
         return signals
 
 class Generic(Signal):
@@ -249,7 +249,7 @@ class Port(Signal):
         if t in ["in", "out", "inout", "buffer", "linkage"]:
             self._port_type = t
         else:
-            print("error: '%s' és un port_type invàlid pel %s '%s'" % (str(t), self._obj_name, self._name))
+            print("error: '%s' is an invalid port type for %s '%s'" % (str(t), self._obj_name, self._name))
 
     def getPortType(self):
         return self._port_type
@@ -378,11 +378,11 @@ class Architecture(object):
         if isinstance(name, str):
             self._name = name
         else:
-            print("error: aquesta arquitectura té un nom invàlid")
+            print("error: the arch '%s' must be a string" % name)
         if isinstance(ent, Entity):
             self._archOf = ent
         else:
-            print("error: l'arquitectura '%s' té una entitat invàlida" % self._name)
+            print("error: architecture '%s' has an invalid entity" % self._name)
 
     def getName(self):
         return self._name
