@@ -95,6 +95,7 @@ class Entity(object):
         self._port = {}
         self._generic = {}
         self.rst = ""
+        self.rstActiveLow = True
         self.clk = ""
 
     def getName(self):

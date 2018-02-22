@@ -12,6 +12,9 @@ def libraryTb():
         if l.getName() == "work":
             continue # skip work library, but not work packages
         libs += ['library %s;\n' % l.getName()]
+    numeric_std = 'use ieee.numeric_std.all;'
+    if numeric_std not in uses and 'library ieee;\n' in libs:
+        uses += [numeric_std] 
     return "%s%s\n\n" % ("\n".join(libs), "\n".join(uses))
 
 def entityTb():
@@ -28,7 +31,7 @@ def architectureTb():
         result += generics[1] + portsTb() + generics[0] + clk[0] + dutSignalsTb() + dutTb() + clk[1] + resetTb()
         result += "\n\n\tstim_process: process\nbegin\n\t\t"
         if entity.rst:
-            result += "wait on {0};\n\t\t".format(entity.rst) # TODO Doesn't actually work...
+            result += "wait until {0} = '{1}';\n\t\t".format(entity.rst, int(entity.rstActiveLow))
         result += "--insert stimulus here\n\n\t\tassert false\n\t\t\treport \"Simulation finished\"\n\t\t\tseverity failure;\n\tend process stim_process;\n\nend behav;"
     return result
 
@@ -81,10 +84,10 @@ def dutTb():
 def resetTb():
     clk = True
     clkStr = "*clk_period"
-    activeHigh = True
     rst_len = 0
-    rst = list(vhdl.getEntities())[0].rst
-    if not list(vhdl.getEntities())[0].clk:
+    entity = list(vhdl.getEntities())[0]
+    rst = entity.rst
+    if not entity.clk:
         confirm = input("No clock is present, but reset is. Add reset anyway? [Y/n] ")
         if "n" in confirm.lower():
             rst = ""
@@ -92,21 +95,19 @@ def resetTb():
             clkStr = "100 ns"
             clk = False
     if rst:
-        if rst.find("n") >= 0:
-            activeHigh = False
         while True and clk:
             try:
-                rst_len = input("Number of periods to hold rst (default 5): ") # TODO: make sure reset is deasserted on the falling edge
+                rst_len = input("Number of periods to hold rst (default 5): ") 
                 if rst_len == "":
                     rst_len = "5"
-                rst_len = int(rst_len)
+                rst_len = int(rst_len) # rising clk edges happen at half periods, so this forces falling edge deassertion
                 if rst_len > 0:
                     break
             except Exception as e:
                 print(e)
                 print("error: Invalid reset length")
 
-        return "\n\n\trst_process: process\n\tbegin\n\t\t%s <= '%d';\n\t\twait for %s%s;\n\t\t%s <= '%d';\n\t\twait;\n\tend process rst_process;" % (rst, activeHigh, rst_len if clk else "", clkStr, rst, not activeHigh)
+        return "\n\n\trst_process: process\n\tbegin\n\t\t%s <= '%d';\n\t\twait for %s%s;\n\t\t%s <= '%d';\n\t\twait;\n\tend process rst_process;" % (rst, not entity.rstActiveLow, rst_len if clk else "", clkStr, rst, entity.rstActiveLow)
     else:
         return ""
 
@@ -152,7 +153,7 @@ if __name__ == "__main__":
     # Creating VHDL obj
     vhdl = VHDL()
     libs = parseLibs(vhd_file)
-    [vhdl.addLibrary(l) for l in libs] # TODO add numeric_std if not present
+    [vhdl.addLibrary(l) for l in libs]
     [vhdl.setEntity(e) for e in parseEntities(vhd_file)]
 
     # Get each entity in 'vhdl' and adds each architecture in 'vhdl'

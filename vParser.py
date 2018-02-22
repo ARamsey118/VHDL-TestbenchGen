@@ -94,11 +94,11 @@ def parseLibs(vhdl_file):
         use_statment = value[0].strip().lower().split(".")
         lib, package = use_statment[0], ".".join(use_statment[1:])
 
-        if lib in libs.keys() or lib == "work":
-            if not ignore_line:
+        if not ignore_line:
+            if lib in libs.keys():
                 libs[lib].addPackage(package)
-        else:
-            print("error: library '%s' is being used by the package '%s.%s' but has not been added" % (lib, lib, package))
+            else:
+                print("error: library '%s' is being used by the package '%s.%s' but has not been added" % (lib, lib, package))
             break
 
     return libs.values()
@@ -147,6 +147,10 @@ def parsePortsGenerics(vhdl_file, entity, isPort):
                     clk_search = False # TODO This is probably not the best way
                 else:
                     entity.rst = port
+                    if port.find("n") >= 0:
+                        entity.rstActiveLow = True
+                    else:
+                        entity.rstActiveLow = False
         else:
             entity.setGenericList(GenericList(port))
     elif isPortFound:
