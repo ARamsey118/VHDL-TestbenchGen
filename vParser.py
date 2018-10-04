@@ -49,7 +49,9 @@ def parseLibs(vhdl_file):
 
         ignore_line = False
 
-        for i in range(last_pos, last_pos + len(value[0]))[::-1]:
+        last_pos += value[1]
+
+        for i in range(last_pos - len("library" + value[0] + ";\n"), last_pos )[::-1]:
             if vhdl_file[i] == '\n':
                 break
 
@@ -57,7 +59,6 @@ def parseLibs(vhdl_file):
                 ignore_line = True
                 break
 
-        last_pos += value[1]
 
         if value == ("", -1):
             break
@@ -78,7 +79,9 @@ def parseLibs(vhdl_file):
 
         ignore_line = False
 
-        for i in range(last_pos, last_pos + len(value[0]))[::-1]:
+        last_pos += value[1]
+
+        for i in range(last_pos - len("use" + value[0] + ";\n"), last_pos )[::-1]:
             if vhdl_file[i] == '\n':
                 break
 
@@ -86,7 +89,6 @@ def parseLibs(vhdl_file):
                 ignore_line = True
                 break
 
-        last_pos += value[1]
 
         if value == ("", -1):
             break
@@ -139,9 +141,10 @@ def parsePortsGenerics(vhdl_file, entity, isPort):
             rsts = ['rst', 'reset']
             clk_search = True
             for search_port in [clks, rsts]:
-                port = [port for port in ports if any(x in port for x in search_port)]
-                if port:
-                    port = port[0] # TODO Deal with multiple clocks/resets
+                port = [port for port in ports if any(x in port.lower() for x in search_port)]
+                if not port:
+                    break
+                port = port[0] # TODO Deal with multiple clocks/resets
                 if clk_search:
                     entity.clk = port
                     clk_search = False # TODO This is probably not the best way

@@ -117,7 +117,7 @@ def clockTb():
         while True:
             try:
                 clk_freq = input("Enter clock period (ns) (default 10): ")
-                if clk_freq == "":
+                if not clk_freq:
                     clk_freq = "10"
                 clk_freq = int(clk_freq)
                 if clk_freq > 0:

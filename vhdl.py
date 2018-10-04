@@ -182,6 +182,10 @@ class SignalList(object):
 
     def _getSignalFromString(self, s):
         signals = {}
+        while s.find("component") != -1:
+            comp = getBetween(s, "component", "end component;")
+            if comp:
+                s = s[0:s.find("component")] + s[comp[1] + len("end component;"):]
         try:
             for signal in s.split(";"):
                 signal = signal.strip()
@@ -293,10 +297,18 @@ class PortList(object):
                     break
             if counting:
                 between_port += s[i]
-        port = between_port.strip()[1:].replace("\n", "")
-        for p in port.split(";"):
+        port = between_port.strip()[1:].strip()
+        for p in port.split("\n"):
             port_name, t = p.split(":")
             port_name = port_name.strip()
+            port_name = port_name.strip("signal") # Remove the optional leading signal
+            semi = t.find(";")
+            if semi != -1:
+                t = t[:semi] # remove semicolon and later
+            comment = t.find("--")
+            if comment != -1:
+                t = t[:comment] # remove semicolon and later
+
             if port_name[0:2] == "--":
                 continue
             t = t.strip()
@@ -309,7 +321,7 @@ class PortList(object):
                 for n in port_name.split(","):
                     n = n.strip()
                     ports[n] = Port(n, port_type, variable_type)
-            else:		
+            else:
                 ports[port_name] = Port(port_name, port_type, variable_type)
         return ports
 
@@ -404,3 +416,11 @@ class Architecture(object):
 
     def __str__(self):
         return "<Architecture %s of %s>" % (self._name, self._archOf.getName())
+
+def getBetween(s, pref, suf):
+    try:
+        start = 0 if pref == "" else s.index(pref)
+        end = len(s) if suf == "" else s[start:].index(suf)
+        return (s[start + len(pref):start+end], start+end)
+    except Exception:
+        return ("", -1)
